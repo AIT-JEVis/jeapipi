@@ -18,6 +18,13 @@ class JEVisConnector:
         self.R = None
         self.AUTH = HTTPBasicAuth(self.USER, self.PASSWORD)
 
+    def getSeperator(self, query):
+            if query:
+                return "&"
+            else:
+                return "?"
+                
+                
     def isConnected(self):
         """check if the JEVis-REST-API is available"""
         url = self.SERVER + "/objects"
@@ -30,6 +37,15 @@ class JEVisConnector:
             print("Connection Failed, Exception: ", e)
             return 0
 
+
+    def query(self, query):
+        url = self.SERVER + query
+        print("url: ", url)
+        self.R = requests.get(url, auth=self.AUTH)
+        
+        # TODO: error handling
+        return self.R.json()
+        
     def getLastRequest(self):
         return self.R
 
@@ -39,14 +55,70 @@ class JEVisConnector:
             return 0
         return self.R.status_code
 
-    def getObject(self, id):
-        url = self.SERVER + "/objects/{}".format(id)
-        print("url: ", url)
-        self.R = requests.get(url, auth=self.AUTH)
-        
-        # TODO: error handling
-        return self.R.json()
 
+
+
+
+    def getObject(self, root=None, jclass=None, inherit=None, name=None,detail=None, parent=None, child=None):
+        params = ""
+         
+        if root:
+            params += "{}root={}".format(self.getSeperator(params), root)
+        if jclass:
+            params += "{}class={}".format(self.getSeperator(params), jclass)
+        if inherit:
+            params += "{}inherit={}".format(self.getSeperator(params), inherit)
+        if name:
+            params += "{}name={}".format(self.getSeperator(params), name)
+        if parent:
+            params += "{}parent={}".format(self.getSeperator(params), parent)
+        if child:
+            params += "{}child={}".format(self.getSeperator(params), child)
+        
+        query = "/objects{}".format(params)
+        return self.query(query)
+        
+    def getObjectByID(self, id, detail=None):
+        params = ""
+         
+        if detail:
+            params += "{}detail={}".format(self.getSeperator(params), detail)
+        
+        query = "/objects/{}{}".format(id,params)
+        return self.query(query)
+        
+        
+    def getAttributes(self, id):
+        query = "/objects/{}/attributes".format(id)
+        return self.query(query)
+    
+    def getAttribute(self, id, attribute):
+        query = "/objects/{}/attributes/{}".format(id, attribute)
+        return self.query(query)
+        
+    # "yyyyMMdd'T'HHmmss
+    def getSamples(self, id, attribute="Value", start=None, end=None, onlyLatest=None):
+        params = ""
+         
+        if start:
+            params += "{}from={}".format(self.getSeperator(params), start)
+        if end:
+            params += "{}until={}".format(self.getSeperator(params), end)
+        if onlyLatest:
+            params += "{}onlyLatest={}".format(self.getSeperator(params), onlyLatest)
+
+        query = "/objects/{}/attributes/{}/samples{}".format(id, attribute, params)
+        return self.query(query)
+      
+      
+      
+      
+      
+      
+
+    
+
+      
     def deleteObject(self, id):
         url = self.SERVER + "/objects/{}".format(id)
         print("url: ", url)
@@ -54,15 +126,6 @@ class JEVisConnector:
         
         # TODO: error handling
         return self.R
-
-    def getObjectQuery(self, id, query):
-        url = self.SERVER + "/objects/{}".format(id)
-        url += query
-        print("url: ", url)
-        self.R = requests.get(url, auth=self.AUTH)
-        
-        # TODO: error handling
-        return self.R.json()
 
     def getClassObjects(self, className):
         url = self.SERVER + "/objects"
@@ -86,9 +149,10 @@ class JEVisConnector:
         children = []
         for rel in rels:
             if rel['type'] == '1':
-                # type 1, to parent, from child
-                #print("to: ", rel['to'], " from: ", rel['from'])
-                children.append(rel['from'])
+                if rel['from'] != id:
+                    # type 1, to parent, from child
+                    #print("to: ", rel['to'], " from: ", rel['from'])
+                    children.append(rel['from'])
         return children
 
     def getLatestFile(self, id, attribute, filename=None):
